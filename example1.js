@@ -1,12 +1,13 @@
 const tracer = require('dd-trace').init({
   env: "manual-instrumentation-practice",
-  service: "manual-instrumentation-practice"
+  service: "request",
+  analytics: true
 });
 
 const request = () => {
-  tracer.trace('custom.trace', (span, callback) => {
-    span.setOperationName("request");
-    console.log("hello");
+  // tracer.trace() takes an operaton name, trace options, and an optional callback
+  tracer.trace('request', { type: "web", resource: "web request"}, (span, callback) => {
+    console.log("hello from request!");
     span.addTags({
       functionName: "request",
       info: "contains a callback which prolongs completion of span to execution of other functions"
@@ -20,13 +21,16 @@ const request = () => {
 };
 
 const innerFunction = () => {
-  tracer.trace('inner.span.1', (span, callback) => {
-    span.setOperationName("innerFunction");
-    console.log("hello again");
+  // the operation name is set with span.setOperationName() instead of as an argument for trace.trace()
+  tracer.trace('innerFunction', { type: "function", resource: "function" }, (span, callback) => {
+    // span.setOperationName("innerFunction");
+    console.log("hello from innFunction()!");
+    console.log("adding two tags with span.addTags()...")
     span.addTags({
       functionName: "innerFunction",
       info: "this has a span.finish() function applied before the next function"
     })
+    // you can force a span to end with span.finish()
     span.finish()
     anotherInnerFunction();
     callback(console.log("ready..."))
@@ -34,23 +38,14 @@ const innerFunction = () => {
 };
 
 const anotherInnerFunction = () => {
-  tracer.trace('inner.span.2', span => {
-    span.setOperationName("anotherInnerFunction");
-    console.log("hello a third time");
-    span.addTags({
-      functionName: "anotherInnerFunction"
-    })
-  });
-};
-
-const anotherRequest = () => {
-  tracer.trace('another.custom.trace', (span, callback) => {
-    span.setOperationName("anotherRequest");
-    console.log("hello");
-    innerFunction();
-    callback(console.log("goodbye"));
+  tracer.trace('anotherInnerFunction', { type: "db", service: "database", resource: "db query" }, span => {
+    console.log("hello from anotherInnerFunction()!");
+    // add a tag
+    span.setTag("operation", "this is a mock database resource");
+    // span.tracer() returns the trace object that generated the span
+    console.log(span.tracer());
+    console.log("Let's see the current span context... \n", tracer.scope());
   });
 };
 
 request();
-anotherRequest();
